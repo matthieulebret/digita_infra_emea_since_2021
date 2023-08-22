@@ -27,18 +27,18 @@ with col3:
 
 @st.cache_data
 def get_data():
-    path = 'C:/Users/matth/OneDrive/Asus old pc/Documents/Inframation_Europe_Deals since 2021/'
+    # path = 'C:/Users/matth/OneDrive/Asus old pc/Documents/Inframation_Europe_Deals since 2021/'
 
-    bigdf = pd.read_excel(path + 'deals_insto_europe.xlsx')
+    bigdf = pd.read_excel('deals_insto_europe.xlsx')
     bigdf['lendersFundingValues'] = bigdf['lendersFundingValues'].apply(literal_eval)
 
-    uniqueLenders = pd.read_excel(path + 'uniquelenders_classified_for_upload.xlsx')
+    uniqueLenders = pd.read_excel('uniquelenders_classified_for_upload.xlsx')
 
     lenderdf = pd.DataFrame(bigdf.pop('lendersFundingValues').explode())
     lenderdf = pd.concat([lenderdf, lenderdf['lendersFundingValues'].apply(pd.Series)], axis=1)
     lenderdf = bigdf.join(lenderdf)
 
-    countriesregions = pd.read_excel(path + 'uniquecountries.xlsx')
+    countriesregions = pd.read_excel('uniquecountries.xlsx')
 
     lenderdf = lenderdf.merge(uniqueLenders,left_on='name',right_on='Name')
 
