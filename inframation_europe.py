@@ -1,14 +1,8 @@
 import pandas as pd
-import os
-import json
-import itertools
 import plotly.express as px
 import plotly.io as pio
 import streamlit as st
 from ast import literal_eval
-import numpy as np
-
-from kmodes.kmodes import KModes
 
 pio.renderers.default = 'iframe'
 

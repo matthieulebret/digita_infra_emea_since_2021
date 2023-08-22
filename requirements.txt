@@ -1,7 +1,5 @@
-kmodes
-numpy
 pandas
 plotly
 streamlit
-+openpyxl
+openpyxl
 
