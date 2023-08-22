@@ -3,5 +3,5 @@ numpy
 pandas
 plotly
 streamlit
-openpyxl
+openpyxl==3.0.7
 
