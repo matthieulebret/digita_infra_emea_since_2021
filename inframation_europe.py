@@ -7,7 +7,7 @@ import plotly.io as pio
 import streamlit as st
 from ast import literal_eval
 import numpy as np
-import openpyxl
+
 from kmodes.kmodes import KModes
 
 pio.renderers.default = 'iframe'
