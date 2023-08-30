@@ -4,6 +4,8 @@ import plotly.io as pio
 import streamlit as st
 from ast import literal_eval
 
+from sklearn.cluster import KMeans
+
 pio.renderers.default = 'iframe'
 
 st.set_page_config(layout = 'wide')
@@ -117,6 +119,7 @@ with tab1:
         st.info('Half of the market by volume involves instos')
         fig = px.sunburst(marketsunburstvol,path=['Deal Category','dominantSector','dominantCountry'],values='valueEUR')
         st.write(fig)
+
     with col2:
         st.header('Market split - Banks, Instos, Mixed deals (deal count)')
 
@@ -228,6 +231,37 @@ with tab2:
         fig.update_layout(xaxis={'categoryorder':'total descending'})
         st.write(fig)
 
+        st.subheader('Percentage of volume by deal type and sector')
+
+        dfbysector = pd.pivot_table(lenderdf[(lenderdf['Deal Category'] == 'Mixed')], index=['dominantSector'],
+                                    values='valueEUR', columns=['details.transactionType'], aggfunc='sum')
+        dfbysector = dfbysector[['Greenfield', 'Additional Financing', 'Refinancing']]
+
+        dfbysector['Total'] = dfbysector.sum(axis=1)
+        for col in dfbysector.columns:
+            dfbysector[col] = dfbysector[col] / dfbysector['Total']
+        dfbysector = dfbysector.iloc[:, :-1]
+
+        fig = px.imshow(dfbysector.transpose(), text_auto='.2%', color_continuous_scale='greens', )
+        fig.update(layout_coloraxis_showscale=False)
+
+        st.write(fig)
+
+        st.subheader('Percentage of volume by deal type and lender category')
+
+        dfbytype = pd.pivot_table(lenderdf[(lenderdf['Deal Category'] == 'Mixed')], index='Categories',
+                                  values='valueEUR', columns=['details.transactionType'], aggfunc='sum')
+        dfbytype = dfbytype[['Greenfield', 'Additional Financing', 'Refinancing']]
+
+        dfbytype['Total'] = dfbytype.sum(axis=1)
+        for col in dfbytype.columns:
+            dfbytype[col] = dfbytype[col] / dfbytype['Total']
+        dfbytype = dfbytype.iloc[:, :-1]
+
+        fig = px.imshow(dfbytype.transpose(), text_auto='.2%', color_continuous_scale='greens')
+        fig.update(layout_coloraxis_showscale=False)
+        st.write(fig)
+
     with col2:
 
         st.subheader('Average ticket size on mixed deals')
@@ -242,21 +276,22 @@ with tab2:
         df = df.merge(norddf,left_index=True,right_index=True)
         df.columns=['Market average ticket','Nord/LB average ticket']
 
-
         fig = px.bar(df,barmode='group')
         fig.update_layout(xaxis={'categoryorder':'total descending'})
         st.write(fig)
 
-    st.subheader('Average ticket size on mixed deals - split by lender type')
 
-    df = pd.pivot_table(lenderdf[lenderdf['Deal Category'] == 'Mixed'], index=['dominantSector'],columns='Categories',values='valueEUR', aggfunc='mean')
+        st.subheader('Average ticket size on mixed deals - split by lender type')
 
-    fig = px.bar(df,barmode='group')
-    st.write(fig)
+        df = pd.pivot_table(lenderdf[lenderdf['Deal Category'] == 'Mixed'], index=['dominantSector'],columns='Categories',values='valueEUR', aggfunc='mean')
 
-    with st.expander('See data'):
-        norddflong
-        df
+        fig = px.bar(df,barmode='group')
+        st.write(fig)
+
+        with st.expander('See data'):
+            norddflong
+            df
+
 
 
 with tab3:
@@ -353,4 +388,153 @@ with tab3:
     st.header('Deals where instos invest')
 
     df = pd.pivot_table(instolenderdf,values='summary.debtsizeEUR',index=['dominantSector'],aggfunc=['count','mean','median'])
+    df
+
+with tab4:
+
+    st.header('Segmentation dimensions')
+    # st.header('Insto sector allocation')
+
+    #list investors min x deals
+
+    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    mindeals = st.number_input('Min number of deals',value=2,step=1)
+    countdf = pd.pivot_table(df,index='Name',values='valueEUR',aggfunc='count')
+    countdf = countdf[countdf['valueEUR']>=mindeals]
+    countdf.reset_index(inplace=True)
+    investorlist = countdf['Name'].unique().tolist()
+
+    df = df[df['Name'].isin(investorlist)]
+    df = pd.pivot_table(df, index='Name',values='valueEUR',columns='dominantSector')
+    df.dropna()
+    df['Total'] = df.sum(axis=1)
+    for col in df.columns:
+        df[col] = df[col]/df['Total']
+
+    df = df[[col for col in df.columns[:-1]]]
+    df = df.fillna(0)
+    allocdf = df
+
+
+    # st.header('Insto ticket size distribution')
+
+    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    countdf = pd.pivot_table(df, index='Name', values='valueEUR', aggfunc='count')
+    countdf = countdf[countdf['valueEUR'] >= mindeals]
+    countdf.reset_index(inplace=True)
+    investorlist = countdf['Name'].unique().tolist()
+
+    df = df[df['Name'].isin(investorlist)]
+
+    def ticketbucket(ticket):
+        if ticket<=60:
+            return 'Less than 60'
+        elif ticket <=100:
+            return 'Less than 100'
+        else:
+            return 'More than 100'
+
+    df['Ticket bucket'] = df['valueEUR'].apply(ticketbucket)
+
+    df = pd.pivot_table(df,index='Name',values='valueEUR',columns='Ticket bucket',aggfunc='count')
+
+    df['Total'] = df.sum(axis=1)
+    for col in df.columns:
+        df[col] = df[col] / df['Total']
+
+    df = df[[col for col in df.columns[:-1]]]
+    df = df.fillna(0)
+    df = df[['Less than 60','Less than 100','More than 100']]
+    ticketdf = df
+
+
+    # st.header('Greenfield / Brownfield distribution')
+
+    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    countdf = pd.pivot_table(df, index='Name', values='valueEUR', aggfunc='count')
+    countdf = countdf[countdf['valueEUR'] >= mindeals]
+    countdf.reset_index(inplace=True)
+    investorlist = countdf['Name'].unique().tolist()
+
+    df = df[df['Name'].isin(investorlist)]
+
+    df = pd.pivot_table(df, index='Name', values='valueEUR', columns='details.transactionType', aggfunc='sum')
+
+    df['Total'] = df.sum(axis=1)
+    for col in df.columns:
+        df[col] = df[col] / df['Total']
+
+    df = df[[col for col in df.columns[:-1]]]
+    df = df.fillna(0)
+
+    df = df[['Greenfield','Additional Financing','Refinancing']]
+    stagedf = df
+
+    # st.header('Country distribution')
+
+    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    countdf = pd.pivot_table(df,index='Name',values='valueEUR',aggfunc='count')
+    countdf = countdf[countdf['valueEUR']>=mindeals]
+    countdf.reset_index(inplace=True)
+    investorlist = countdf['Name'].unique().tolist()
+
+    df = df[df['Name'].isin(investorlist)]
+    df = pd.pivot_table(df, index='Name',values='valueEUR',columns='dominantCountry')
+    df.dropna()
+    df['Total'] = df.sum(axis=1)
+    for col in df.columns:
+        df[col] = df[col]/df['Total']
+
+    df = df[[col for col in df.columns[:-1]]]
+    df = df.fillna(0)
+    countrydf = df
+
+
+
+    with st.form('segments'):
+        dimensions = st.multiselect('Select your dimensions',['Sector','Ticket size','Deal stage','Country'],['Sector','Ticket size'])
+        k = st.number_input('Please input desired number of clusters', 2, 12, 4, key=2)
+        st.form_submit_button('Submit')
+
+
+    dimlist = []
+    if 'Sector' in dimensions:
+        dimlist.append(allocdf)
+    if 'Ticket size' in dimensions:
+        dimlist.append(ticketdf)
+    if 'Deal stage' in dimensions:
+        dimlist.append(stagedf)
+    if 'Country' in dimensions:
+        dimlist.append(countrydf)
+
+    df = pd.concat(dimlist, axis=1)
+
+
+    wcss=[]
+    for i in range(1,10):
+
+        kmeans = KMeans(i)
+        kmeans.fit(df)
+        wcss_iter = kmeans.inertia_
+        wcss.append(wcss_iter)
+
+    number_clusters = range(1,10)
+    fig = px.line(x=number_clusters,y=wcss,title='Optimal number of clusters')
+    st.plotly_chart(fig)
+
+
+    kmeans = KMeans(k)
+    kmeans.fit(df)
+    identified_clusters = kmeans.fit_predict(df)
+    df['Clusters']=identified_clusters
+    summary = df.groupby('Clusters').mean()
+
+
+    fig = px.imshow(summary, text_auto='.2%', color_continuous_scale='greens')
+    fig.update_yaxes(tick0=0,dtick=1)
+    fig.update(layout_coloraxis_showscale=False)
+
+    st.write(fig)
+
+
     df
