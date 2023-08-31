@@ -551,3 +551,10 @@ with tab4:
         showdf = df[df['Clusters']==i].iloc[:,:-1]
         showdf = showdf.style.format('{:.2%}')
         st.write(showdf)
+
+    @st.cache_data
+    def convert_df(df):
+        return df.to_csv().encode('utf-8')
+    csv = convert_df(df)
+
+    st.download_button('Download data as csv',data=csv,file_name='segments.csv',mime='text/csv')
