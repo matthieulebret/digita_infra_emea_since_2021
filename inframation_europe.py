@@ -395,9 +395,18 @@ with tab4:
     st.header('Segmentation dimensions')
     # st.header('Insto sector allocation')
 
+    categorieslist = lenderdf['Categories'].unique().tolist()
+
+    with st.form('segments'):
+        investorcat = st.multiselect('Select your investor types',categorieslist,['Asset Manager','Insurance','Pension Fund'])
+        dimensions = st.multiselect('Select your dimensions',['Sector','Ticket size','Deal stage','Country'],['Sector','Ticket size'])
+        k = st.number_input('Please input desired number of clusters', 2, 12, 4, key=2)
+        st.form_submit_button('Submit')
+
+
     #list investors min x deals
 
-    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    df = lenderdf[(lenderdf['Categories'].isin(investorcat)) & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
     mindeals = st.number_input('Min number of deals',value=2,step=1)
     countdf = pd.pivot_table(df,index='Name',values='valueEUR',aggfunc='count')
     countdf = countdf[countdf['valueEUR']>=mindeals]
@@ -418,7 +427,7 @@ with tab4:
 
     # st.header('Insto ticket size distribution')
 
-    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    df = lenderdf[(lenderdf['Categories'].isin(investorcat)) & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
     countdf = pd.pivot_table(df, index='Name', values='valueEUR', aggfunc='count')
     countdf = countdf[countdf['valueEUR'] >= mindeals]
     countdf.reset_index(inplace=True)
@@ -450,7 +459,7 @@ with tab4:
 
     # st.header('Greenfield / Brownfield distribution')
 
-    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    df = lenderdf[(lenderdf['Categories'].isin(investorcat)) & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
     countdf = pd.pivot_table(df, index='Name', values='valueEUR', aggfunc='count')
     countdf = countdf[countdf['valueEUR'] >= mindeals]
     countdf.reset_index(inplace=True)
@@ -472,7 +481,7 @@ with tab4:
 
     # st.header('Country distribution')
 
-    df = lenderdf[(lenderdf['Bank / Insto'] == 'Insto') & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
+    df = lenderdf[(lenderdf['Categories'].isin(investorcat)) & (lenderdf['Deal Category'] != 'Bank only')&(lenderdf['valueEUR'] >0)]
     countdf = pd.pivot_table(df,index='Name',values='valueEUR',aggfunc='count')
     countdf = countdf[countdf['valueEUR']>=mindeals]
     countdf.reset_index(inplace=True)
@@ -491,10 +500,6 @@ with tab4:
 
 
 
-    with st.form('segments'):
-        dimensions = st.multiselect('Select your dimensions',['Sector','Ticket size','Deal stage','Country'],['Sector','Ticket size'])
-        k = st.number_input('Please input desired number of clusters', 2, 12, 4, key=2)
-        st.form_submit_button('Submit')
 
 
     dimlist = []
@@ -519,11 +524,14 @@ with tab4:
         wcss.append(wcss_iter)
 
     number_clusters = range(1,10)
-    fig = px.line(x=number_clusters,y=wcss,title='Optimal number of clusters')
-    st.plotly_chart(fig)
 
+    with st.expander('Show elbow chart'):
+        fig = px.line(x=number_clusters,y=wcss,title='Optimal number of clusters')
+        st.plotly_chart(fig)
 
-    kmeans = KMeans(k)
+    st.subheader('High level view of each cluster')
+
+    kmeans = KMeans(k,random_state=42,max_iter=300)
     kmeans.fit(df)
     identified_clusters = kmeans.fit_predict(df)
     df['Clusters']=identified_clusters
@@ -537,4 +545,9 @@ with tab4:
     st.write(fig)
 
 
-    df
+
+    for i in range(k):
+        st.subheader('Cluster number: '+str(i))
+        showdf = df[df['Clusters']==i].iloc[:,:-1]
+        showdf = showdf.style.format('{:.2%}')
+        st.write(showdf)
